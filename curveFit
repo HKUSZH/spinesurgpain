@@ -1,0 +1,235 @@
+library(tidyverse)
+library(ggplot2)
+
+basicInfo<-readxl::read_excel("pain-table.xlsx", sheet = "basicInfo")
+
+for(i in setdiff(seq(8), 5)){
+	sheetName<-paste0("patient", i)
+	patient1<-readxl::read_excel("pain-table.xlsx", sheet = sheetName)
+	names(patient1)[c(1, 6, 7)]<-c("index", "restingPainScore", "movingPainScore")
+	patient1 %>% filter(!is.na(index))
+	patient1.2<-patient1 %>% filter(!is.na(index))
+	#patient1.2<-patient1 %>% filter(grepl("[0-9]", index))
+	dateStr<-paste0("2024-",patient1.2[["...2"]],"-",patient1.2[["...3"]])
+	patient1.2[["dateStr"]]<-dateStr
+	#patient1.2<-patient1.2 %>% filter(grepl("NA", patient1.2))
+	timeStr<-paste0(patient1.2[["...4"]],":",patient1.2[["...5"]],":00")
+	dateTimeStr<-paste0(dateStr, " ", timeStr)
+	timei<-as.POSIXct(dateTimeStr, format = "%Y-%m-%d %H:%M:%S", tz = "Asia/Hong_Kong")
+	patient1.2[["time"]]<-timei
+
+	indPostOp1<-grep("术后1$", patient1.2[["index"]])
+
+	hoursPostOp<-as.numeric(as.integer(difftime(timei, timei[indPostOp1])))/3600.0
+	patient1.2[["hoursPostOp"]]<-hoursPostOp
+	patient1.2[["daysPostOp"]]<-hoursPostOp/24
+
+	patient1.2[["painR"]]<-as.numeric(patient1.2[["restingPainScore"]])
+	patient1.2[["painM"]]<-as.numeric(patient1.2[["movingPainScore"]])
+
+	if(i==1){
+		DATA<-patient1.2 %>% select(daysPostOp, hoursPostOp, painR, painM)
+		DATA[["patientID"]]<-i
+	}else{
+		tmpi<-patient1.2 %>% select(daysPostOp, hoursPostOp, painR, painM)
+		tmpi[["patientID"]]<-i
+		DATA<-rbind(DATA, tmpi)
+	}
+}
+
+DATA2<-DATA %>% mutate(GRP=paste0("Pat",patientID)) %>% filter(!is.na(hoursPostOp))
+
+DATA2[["patient"]]<-basicInfo[["患者姓名"]][match(DATA2[["GRP"]], basicInfo[["no"]])]
+DATA2<-DATA2%>% mutate(nameAndID=paste0(GRP,": ", patient))
+
+
+ggplot(DATA2, aes(x=hoursPostOp, y=painR, group=nameAndID)) +
+	geom_point() +
+	geom_line() +
+	geom_smooth(aes(group=GRP, color=nameAndID))
+
+png("first-7-patients-pain-scores-post-op-resting.png", width=1200, height=800)
+	ggplot(DATA2, aes(x=daysPostOp, y=painR, group=nameAndID)) +
+		geom_point(aes(color=nameAndID)) +
+		geom_line(aes(color=nameAndID)) +
+		geom_smooth(aes(group=nameAndID, color=nameAndID), size=2) +
+		xlab("Days Post Op") + ylab("Resting Pain Scores (0 to 10)") +
+		ylim(c(-1,8)) +
+		ggtitle("Resting Pain Scores")
+dev.off()
+
+png("first-7-patients-pain-scores-post-op-moving.png", width=1200, height=800)
+	ggplot(DATA2 %>% filter(hoursPostOp>0), aes(x=daysPostOp, y=painM, group=nameAndID)) +
+		geom_point(aes(color=nameAndID), size=4) +
+		geom_line(aes(color=nameAndID)) +
+		geom_smooth(aes(group=nameAndID, color=nameAndID), size=2) +
+		xlab("Days Post Op (days)") + ylab("moving Pain Scores (0 to 10)")+
+		ylim(c(-1,8)) +
+		ggtitle("Moving Pain Scores")+
+		theme(legend.key.size = unit(1, 'cm'), #change legend key size
+        		legend.key.height = unit(1, 'cm'), #change legend key height
+        		legend.key.width = unit(2, 'cm'), #change legend key width
+        		legend.title = element_text(size=20), #change legend title font size
+        		legend.text = element_text(size=20))+
+		theme(text=element_text(size=20), #change font size of all text
+        		axis.text=element_text(size=20), #change font size of axis text
+       		axis.title=element_text(size=20), #change font size of axis titles
+        		plot.title=element_text(size=20), #change font size of plot title
+        		legend.text=element_text(size=20), #change font size of legend text
+       		legend.title=element_text(size=20)) +
+		scale_y_continuous(breaks=seq(0,8)) +
+		scale_x_continuous(breaks=seq(0,13))+
+		theme(panel.grid = element_line(color = "#a0a0a0",
+                                  size = 0.5,
+                                  linetype = 2))+
+		theme(panel.grid.minor = element_blank()) +
+		labs(color = "Patients:") 
+
+
+	ggplot(DATA2 %>% filter(hoursPostOp>0), aes(x=daysPostOp, y=painR, group=nameAndID)) +
+		geom_point(aes(color=nameAndID), size=4) +
+		geom_line(aes(color=nameAndID)) +
+		geom_smooth(aes(group=nameAndID, color=nameAndID), size=2) +
+		xlab("Days Post Op (days)") + ylab("Resting Pain Scores (0 to 10)")+
+		ylim(c(-1,8)) +
+		ggtitle("Resting Pain Scores")+
+		theme(legend.key.size = unit(1, 'cm'), #change legend key size
+        		legend.key.height = unit(1, 'cm'), #change legend key height
+        		legend.key.width = unit(2, 'cm'), #change legend key width
+        		legend.title = element_text(size=20), #change legend title font size
+        		legend.text = element_text(size=20))+
+		theme(text=element_text(size=20), #change font size of all text
+        		axis.text=element_text(size=20), #change font size of axis text
+       		axis.title=element_text(size=20), #change font size of axis titles
+        		plot.title=element_text(size=20), #change font size of plot title
+        		legend.text=element_text(size=20), #change font size of legend text
+       		legend.title=element_text(size=20)) +
+		scale_y_continuous(breaks=seq(0,8)) +
+		scale_x_continuous(breaks=seq(0,13))+
+		theme(panel.grid = element_line(color = "#a0a0a0",
+                                  size = 0.5,
+                                  linetype = 2))+
+		theme(panel.grid.minor = element_blank()) +
+		labs(color = "Patients:") 
+########################
+
+	ggplot(DATA2 %>% filter(hoursPostOp>0) %>% mutate(painM=jitter(painM, amount=0.1)), 
+			aes(x=daysPostOp, y=painM, group=nameAndID)) +
+		geom_point(aes(color=nameAndID), size=4) +
+		geom_line(aes(color=nameAndID)) +
+		geom_smooth(aes(group=nameAndID, color=nameAndID), size=2) +
+		xlab("Days Post Op (days)") + ylab("moving Pain Scores (0 to 10)")+
+		ylim(c(-1,8)) +
+		ggtitle("Pain Scores while moving, with fitted curves")+
+		theme(legend.key.size = unit(1, 'cm'), #change legend key size
+        		legend.key.height = unit(1, 'cm'), #change legend key height
+        		legend.key.width = unit(2, 'cm'), #change legend key width
+        		legend.title = element_text(size=20), #change legend title font size
+        		legend.text = element_text(size=20))+
+		theme(text=element_text(size=20), #change font size of all text
+        		axis.text=element_text(size=20), #change font size of axis text
+       		axis.title=element_text(size=20), #change font size of axis titles
+        		plot.title=element_text(size=20), #change font size of plot title
+        		legend.text=element_text(size=20), #change font size of legend text
+       		legend.title=element_text(size=20)) +
+		scale_y_continuous(breaks=seq(0,8)) +
+		scale_x_continuous(breaks=seq(0,13))+
+		theme(panel.grid = element_line(color = "#a0a0a0",
+                                  size = 0.5,
+                                  linetype = 2))+
+		theme(panel.grid.minor = element_blank()) +
+		labs(color = "Patients:") 
+
+
+	ggplot(DATA2 %>% filter(hoursPostOp>0) %>% mutate(painR=jitter(painR, amount=0.1)), 
+			aes(x=daysPostOp, y=painR, group=nameAndID)) +
+		geom_point(aes(color=nameAndID), size=4) +
+		geom_line(aes(color=nameAndID)) +
+		geom_smooth(aes(group=nameAndID, color=nameAndID), size=2) +
+		xlab("Days Post Op (days)") + ylab("Resting Pain Scores (0 to 10)")+
+		ylim(c(-1,8)) +
+		ggtitle("Pain Scores while resting, with fitted curves")+
+		theme(legend.key.size = unit(1, 'cm'), #change legend key size
+        		legend.key.height = unit(1, 'cm'), #change legend key height
+        		legend.key.width = unit(2, 'cm'), #change legend key width
+        		legend.title = element_text(size=20), #change legend title font size
+        		legend.text = element_text(size=20))+
+		theme(text=element_text(size=20), #change font size of all text
+        		axis.text=element_text(size=20), #change font size of axis text
+       		axis.title=element_text(size=20), #change font size of axis titles
+        		plot.title=element_text(size=20), #change font size of plot title
+        		legend.text=element_text(size=20), #change font size of legend text
+       		legend.title=element_text(size=20)) +
+		scale_y_continuous(breaks=seq(0,8)) +
+		scale_x_continuous(breaks=seq(0,13))+
+		theme(panel.grid = element_line(color = "#a0a0a0",
+                                  size = 0.5,
+                                  linetype = 2))+
+		theme(panel.grid.minor = element_blank()) +
+		labs(color = "Patients:") 
+
+########################
+########################
+########################
+
+	ggplot(DATA2 %>% filter(hoursPostOp>0) %>% mutate(painM=jitter(painM, amount=0.1)), 
+			aes(x=daysPostOp, y=painM)) +
+		geom_point(aes(color=nameAndID), size=4) +
+		geom_line(aes(color=nameAndID)) +
+		geom_smooth(size=2) +
+		xlab("Days Post Op (days)") + ylab("moving Pain Scores (0 to 10)")+
+		ylim(c(-1,8)) +
+		ggtitle("Pain Scores while moving, with fitted curves")+
+		theme(legend.key.size = unit(1, 'cm'), #change legend key size
+        		legend.key.height = unit(1, 'cm'), #change legend key height
+        		legend.key.width = unit(2, 'cm'), #change legend key width
+        		legend.title = element_text(size=20), #change legend title font size
+        		legend.text = element_text(size=20))+
+		theme(text=element_text(size=20), #change font size of all text
+        		axis.text=element_text(size=20), #change font size of axis text
+       		axis.title=element_text(size=20), #change font size of axis titles
+        		plot.title=element_text(size=20), #change font size of plot title
+        		legend.text=element_text(size=20), #change font size of legend text
+       		legend.title=element_text(size=20)) +
+		scale_y_continuous(breaks=seq(0,8)) +
+		scale_x_continuous(breaks=seq(0,13))+
+		theme(panel.grid = element_line(color = "#a0a0a0",
+                                  size = 0.5,
+                                  linetype = 2))+
+		theme(panel.grid.minor = element_blank()) +
+		labs(color = "Patients:") 
+
+
+	ggplot(DATA2 %>% filter(hoursPostOp>0) %>% mutate(painR=jitter(painR, amount=0.1)), 
+			aes(x=daysPostOp, y=painR)) +
+		geom_point(aes(color=nameAndID), size=4) +
+		geom_line(aes(color=nameAndID)) +
+		geom_smooth(size=2) +
+		xlab("Days Post Op (days)") + ylab("Resting Pain Scores (0 to 10)")+
+		ylim(c(-1,8)) +
+		ggtitle("Pain Scores while resting, with fitted curves")+
+		theme(legend.key.size = unit(1, 'cm'), #change legend key size
+        		legend.key.height = unit(1, 'cm'), #change legend key height
+        		legend.key.width = unit(2, 'cm'), #change legend key width
+        		legend.title = element_text(size=20), #change legend title font size
+        		legend.text = element_text(size=20))+
+		theme(text=element_text(size=20), #change font size of all text
+        		axis.text=element_text(size=20), #change font size of axis text
+       		axis.title=element_text(size=20), #change font size of axis titles
+        		plot.title=element_text(size=20), #change font size of plot title
+        		legend.text=element_text(size=20), #change font size of legend text
+       		legend.title=element_text(size=20)) +
+		scale_y_continuous(breaks=seq(0,8)) +
+		scale_x_continuous(breaks=seq(0,13))+
+		theme(panel.grid = element_line(color = "#a0a0a0",
+                                  size = 0.5,
+                                  linetype = 2))+
+		theme(panel.grid.minor = element_blank()) +
+		labs(color = "Patients:") 
+
+########################
+
+dev.off()
+
+
+
